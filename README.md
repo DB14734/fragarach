@@ -2,4 +2,4 @@
 
 ## Modular CRYPTOSINT Framework
 
-An opensource intelligence framework for cryptocurrency forensics and investigations.
+Opensource Modular OSINT framework for blockchain forensics and investigations.
