@@ -1,0 +1,4 @@
+/target
+.zed
+.env
+.env.local
