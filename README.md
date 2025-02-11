@@ -1,5 +1,5 @@
 # Fragarach
 
-## Open Source CRYPTOSINT Framework
+## Modular CRYPTOSINT Framework
 
-Fragarach is an open source intelligence framework for cyprotcurrency investigations and forensics.
+An opensource intelligence framework for cryptocurrency forensics and investigations.
