@@ -1,10 +1,29 @@
 [package]
 name = "fragarach"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
-
 description = "Modular OSINT framework for blockchain forensics and investigations"
+readme = "README.md"
 license = "MIT"
+homepage = "https://github.com/BD14734/fragarach"
 repository = "https://github.com/BD14734/fragarach"
+documentation = "https://docs.rs/fragarach/"
+keywords = ["blockchain", "crypto", "osint", "bitcoin", "ethereum", "cli"]
+categories = ["finance", "command-line-utilities"]
+authors = ["BD14734"]
 
 [dependencies]
+clap = { version = "4.4", features = ["derive"] }
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+dotenv = "0.15"
+sqlx = { version = "0.7", features = ["sqlite", "postgres", "runtime-tokio-native-tls"] }
+colored = "2.0"
+dialoguer = "0.11.0"
+console = "0.15.10"
+
+[[bin]]
+name = "fragarach"
+path = "src/main.rs"
