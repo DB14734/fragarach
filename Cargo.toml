@@ -8,7 +8,7 @@ license = "MIT"
 homepage = "https://github.com/BD14734/fragarach"
 repository = "https://github.com/BD14734/fragarach"
 documentation = "https://docs.rs/fragarach/"
-keywords = ["blockchain", "crypto", "osint", "bitcoin", "ethereum", "cli"]
+keywords = ["blockchain", "crypto", "osint", "bitcoin", "cli"]
 categories = ["finance", "command-line-utilities"]
 authors = ["BD14734"]
 
