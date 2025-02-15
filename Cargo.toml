@@ -5,12 +5,12 @@ edition = "2021"
 description = "Modular OSINT framework for blockchain forensics and investigations"
 readme = "README.md"
 license = "MIT"
-homepage = "https://github.com/BD14734/fragarach"
-repository = "https://github.com/BD14734/fragarach"
+homepage = "https://github.com/DB14734/fragarach"
+repository = "https://github.com/DB14734/fragarach"
 documentation = "https://docs.rs/fragarach/"
 keywords = ["blockchain", "crypto", "osint", "bitcoin", "cli"]
 categories = ["finance", "command-line-utilities"]
-authors = ["BD14734"]
+authors = ["DB14734"]
 
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }

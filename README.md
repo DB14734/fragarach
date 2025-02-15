@@ -47,7 +47,7 @@ Fragarach is a modular OSINT framework designed for blockchain investigations an
 
 2. **From Source**
    ```bash
-   git clone https://github.com/BD14734/fragarach.git
+   git clone https://github.com/DB14734/fragarach.git
    cd fragarach
    cargo build --release
    ```
