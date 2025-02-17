@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Duration;
 use tokio::time::sleep;
-use sqlx::{SqlitePool, PgPool};
+use duckdb::{Connection, params};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ScanResponse {
@@ -38,8 +38,7 @@ struct ScanOptions {
 pub async fn scan_domain(
     config: &Config,
     domain: &str,
-    sqlite_pool: Option<&SqlitePool>,
-    pg_pool: Option<&PgPool>,
+    conn: &Connection
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Obtain the API key
     let api_key = config.urlscan_api_key().ok_or("URLScan API key not set")?;
@@ -74,48 +73,22 @@ pub async fn scan_domain(
     println!("Scan initiated for domain {}. UUID: {}", domain, uuid);
 
     // Insert initial scan data to URLScan domain data table
-    if let Some(pool) = sqlite_pool {
-        sqlx::query(
-            "INSERT OR REPLACE INTO urlscan_domain_data (
-                domain, uuid, result_url, api_url, visibility, useragent, country
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        )
-        .bind(domain)
-        .bind(uuid)
-        .bind(&initial_scan.result)
-        .bind(&initial_scan.api)
-        .bind(&initial_scan.visibility)
-        .bind(initial_scan.options.as_ref()
-            .and_then(|opt| opt.useragent.as_deref())
-            .unwrap_or("N/A"))
-        .bind(initial_scan.country.as_deref().unwrap_or("N/A"))
-        .execute(pool)
-        .await?;
-    }
-    if let Some(pool) = pg_pool {
-        sqlx::query(
-            "INSERT INTO urlscan_domain_data (
-                domain, uuid, result_url, api_url, visibility, useragent, country
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (uuid) DO UPDATE SET
-                result_url = EXCLUDED.result_url,
-                api_url = EXCLUDED.api_url,
-                visibility = EXCLUDED.visibility,
-                useragent = EXCLUDED.useragent,
-                country = EXCLUDED.country"
-        )
-        .bind(domain)
-        .bind(uuid)
-        .bind(&initial_scan.result)
-        .bind(&initial_scan.api)
-        .bind(&initial_scan.visibility)
-        .bind(initial_scan.options.as_ref()
-            .and_then(|opt| opt.useragent.as_deref())
-            .unwrap_or("N/A"))
-        .bind(initial_scan.country.as_deref().unwrap_or("N/A"))
-        .execute(pool)
-        .await?;
-    }
+    conn.execute(
+        "INSERT OR REPLACE INTO urlscan_domain_data (
+            domain, uuid, result_url, api_url, visibility, useragent, country
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        params![
+            domain,
+            uuid,
+            &initial_scan.result,
+            &initial_scan.api,
+            &initial_scan.visibility,
+            initial_scan.options.as_ref()
+                .and_then(|opt| opt.useragent.as_deref())
+                .unwrap_or("N/A"),
+            initial_scan.country.as_deref().unwrap_or("N/A")
+        ]
+    )?;
 
     // Poll until the full scan result is available (timeout after 120 secs)
     let full_scan: Value = {
@@ -158,36 +131,19 @@ pub async fn scan_domain(
     let verdict_brands = verdicts.get("brands").map(|v| v.to_string()).unwrap_or("[]".to_string());
 
     // Update the domain data record with full scan details
-    if let Some(pool) = sqlite_pool {
-        sqlx::query(
-            "UPDATE urlscan_domain_data
-             SET asn = ?, ip = ?, title = ?, verdict_score = ?, verdict_brands = ?
-             WHERE uuid = ?"
-        )
-        .bind(asn)
-        .bind(ip)
-        .bind(title)
-        .bind(&verdict_score)
-        .bind(&verdict_brands)
-        .bind(uuid)
-        .execute(pool)
-        .await?;
-    }
-    if let Some(pool) = pg_pool {
-        sqlx::query(
-            "UPDATE urlscan_domain_data
-             SET asn = $1, ip = $2, title = $3, verdict_score = $4, verdict_brands = $5
-             WHERE uuid = $6"
-        )
-        .bind(asn)
-        .bind(ip)
-        .bind(title)
-        .bind(&verdict_score)
-        .bind(&verdict_brands)
-        .bind(uuid)
-        .execute(pool)
-        .await?;
-    }
+    conn.execute(
+        "UPDATE urlscan_domain_data
+         SET asn = $1, ip = $2, title = $3, verdict_score = $4, verdict_brands = $5
+         WHERE uuid = $6",
+        params![
+            asn,
+            ip,
+            title,
+            &verdict_score,
+            &verdict_brands,
+            uuid
+        ]
+    )?;
 
     // Download the screenshot from URLScan
     let screenshot_url = format!("https://urlscan.io/screenshots/{}.png", uuid);
@@ -202,41 +158,28 @@ pub async fn scan_domain(
     tokio::fs::write(&screenshot_path, &screenshot_bytes).await?;
 
     // Update record with screenshot path
-    if let Some(pool) = sqlite_pool {
-        sqlx::query("UPDATE urlscan_domain_data SET screenshot_path = ? WHERE uuid = ?")
-            .bind(&screenshot_path)
-            .bind(uuid)
-            .execute(pool)
-            .await?;
-    }
-    if let Some(pool) = pg_pool {
-        sqlx::query("UPDATE urlscan_domain_data SET screenshot_path = $1 WHERE uuid = $2")
-            .bind(&screenshot_path)
-            .bind(uuid)
-            .execute(pool)
-            .await?;
-    }
+    conn.execute(
+        "UPDATE urlscan_domain_data SET screenshot_path = $1 WHERE uuid = $2",
+        params![&screenshot_path, uuid]
+    )?;
 
     // Retrieve the DOM snapshot and store it
     let dom_url = format!("https://urlscan.io/dom/{}/", uuid);
     let dom_resp = client.get(&dom_url).send().await?;
     let dom_data = dom_resp.text().await?;
-    if let Some(pool) = sqlite_pool {
-        sqlx::query("INSERT OR REPLACE INTO urlscan_dom_snapshot (uuid, dom) VALUES (?, ?)")
-            .bind(uuid)
-            .bind(&dom_data)
-            .execute(pool)
-            .await?;
-    }
-    if let Some(pool) = pg_pool {
-        sqlx::query(
+    let dom_snapshot = if !dom_data.is_empty() {
+        Some(dom_data)
+    } else {
+        None
+    };
+
+    // Store DOM snapshot
+    if let Some(dom) = dom_snapshot {
+        conn.execute(
             "INSERT INTO urlscan_dom_snapshot (uuid, dom) VALUES ($1, $2)
-             ON CONFLICT (uuid) DO UPDATE SET dom = EXCLUDED.dom"
-        )
-        .bind(uuid)
-        .bind(&dom_data)
-        .execute(pool)
-        .await?;
+             ON CONFLICT (uuid) DO UPDATE SET dom = $2",
+            params![uuid, dom]
+        )?;
     }
 
     println!("Domain {} scanned successfully.", domain);

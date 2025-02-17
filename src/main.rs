@@ -5,11 +5,10 @@
 /// - API integrations (Transpose, URLScan)
 /// - CLI interface
 /// - Configuration management
-/// - Database connections (SQLite, PostgreSQL)
+/// - Database connections (DuckDB)
 /// 
 /// # Database Initialization
-/// - Creates SQLite database if enabled
-/// - Establishes PostgreSQL connection if configured
+/// - Creates DuckDB database if it doesn't exist
 /// 
 /// # Error Handling
 /// Implements comprehensive error handling for database connections and schema setup
@@ -19,8 +18,7 @@ mod config;
 mod helpers;
 
 use config::Config;
-use sqlx::sqlite::SqlitePool;
-use sqlx::postgres::PgPool;
+use duckdb::Connection;
 use std::fs;
 use std::path::Path;
 
@@ -36,52 +34,19 @@ use std::path::Path;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = Config::new();
 
-    let sqlite_pool = if config.save_as_sqlite {
-        // Create the data/sqlite directory if it doesn't exist
-        fs::create_dir_all("data/sqlite")?;
-        
-        // Check if database file exists, if not, create it
-        let db_path = Path::new("data/sqlite/fragarach.db");
-        if !db_path.exists() {
-            // Touch the file to create it
-            fs::File::create(db_path)?;
-        }
+    // Create the data directory if it doesn't exist
+    fs::create_dir_all("data")?;
+    
+    // Initialize DuckDB connection
+    let db_path = Path::new("data/fragarach.duckdb");
+    let conn = Connection::open(db_path)?;
 
-        match SqlitePool::connect("sqlite:data/sqlite/fragarach.db").await {
-            Ok(pool) => {
-                // Initialize schema immediately after connecting
-                if let Err(e) = crate::helpers::setup_schema::setup_database_schema(&pool).await {
-                    eprintln!("Error setting up database schema: {}", e);
-                }
-                Some(pool)
-            },
-            Err(e) => {
-                eprintln!("Error connecting to SQLite: {}", e);
-                None
-            }
-        }
-    } else {
-        None
-    };
+    // Initialize schema
+    if let Err(e) = helpers::database_setup::setup_database_schema(&conn) {
+        eprintln!("Error setting up database schema: {}", e);
+    }
 
-    let pg_pool = if config.save_as_postgres {
-        if let Some(postgres_url) = config.postgres_url() {
-            match PgPool::connect(&postgres_url).await {
-                Ok(pool) => Some(pool),
-                Err(e) => {
-                    eprintln!("Error connecting to PostgreSQL: {}", e);
-                    None
-                }
-            }
-        } else {
-            eprintln!("PostgreSQL URL not set");
-            None
-        }
-    } else {
-        None
-    };
-
-    cli::run_cli(&mut config, sqlite_pool.as_ref(), pg_pool.as_ref()).await?;
+    cli::run_cli(&mut config, &conn).await?;
 
     Ok(())
 }

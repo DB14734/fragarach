@@ -34,10 +34,6 @@ Fragarach is a modular OSINT framework designed for blockchain investigations an
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
-2. **Database Requirements**
-   - SQLite (default)
-   - PostgreSQL (optional)
-
 ### Installation Methods
 
 1. **Via Cargo**
@@ -59,22 +55,18 @@ Fragarach is a modular OSINT framework designed for blockchain investigations an
    ```bash
    fragarach setup
    ```
-   This will create a `config.json` and `.env` file with:
-   - `SAVE_AS_SQLITE`: SQLite storage toggle (default: true)
-   - `SAVE_AS_POSTGRES`: PostgreSQL storage toggle (default: false)
+   This will create a `.env` file with:
    - `TRANSPOSE_API_KEY`: Transpose API authentication
    - `URLSCAN_API_KEY`: URLScan API authentication
-   - `POSTGRES_URL`: PostgreSQL connection string (if enabled)
 
-2. **Database Configuration**
-   - SQLite: Automatically creates `data/sqlite/fragarach.db`
-   - PostgreSQL: Requires valid connection string in `.env`
+2. **Database**
+   - DuckDB database is automatically created at `data/fragarach.duckdd
 
 ### Dependencies
 
 Core dependencies:
 - `tokio`: Async runtime and utilities
-- `sqlx`: Database operations
+- `duckdb`: Embedded database operations
 - `reqwest`: HTTP client
 - `serde`: Serialization/deserialization
 - `clap`: CLI argument parsing
@@ -88,20 +80,11 @@ UI dependencies:
 ### Core Components
 
 #### Storage Layer
-Supports dual database architecture:
-- **SQLite**: Local storage implementation with:
-  - Data persistence
-  - Record updates
-  - Batch operations
-
-- **PostgreSQL**: Xata Cloud storage implementation featuring:
-  - Schema initialization
-  - Data persistence
-  - Upsert operations
+Uses DuckDB as an embedded analytical database.
 
 #### Schema Design
 
-Common tables across both database systems:
+Database tables:
 1. `ethereum_accounts`
    - Primary account information
    - Creation timestamps
